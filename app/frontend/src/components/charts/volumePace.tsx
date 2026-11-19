@@ -6,12 +6,13 @@ import { priorRunningVolume, runDistanceBands } from "@/lib/charts/priorRunningV
 import type { VolumeRun } from "@/lib/charts/weeklyVolume";
 import { formatPace } from "@/lib/runFormatters";
 
-type Props = { runs: readonly VolumeRun[]; fromDate?: string; toDate?: string };
+type Props = { runs: readonly VolumeRun[]; fromDate?: string; toDate?: string; includeRun?: (run: VolumeRun) => boolean };
 const margin = { top: 16, right: 28, bottom: 52, left: 60 };
 
-export default function VolumePace({ runs, fromDate = "", toDate = "" }: Props) {
+export default function VolumePace({ runs, fromDate = "", toDate = "", includeRun }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [hiddenBands, setHiddenBands] = useState<string[]>([]);
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -27,7 +28,8 @@ export default function VolumePace({ runs, fromDate = "", toDate = "" }: Props) 
     (!fromDate || !toDate || fromDate <= toDate);
   // Calculate history first: the displayed date range must not truncate lookbacks.
   const points = priorRunningVolume(runs).filter((run) => validRange &&
-    (!fromDate || run.date >= fromDate) && (!toDate || run.date <= toDate));
+    (!fromDate || run.date >= fromDate) && (!toDate || run.date <= toDate) && (!includeRun || includeRun(run)));
+  const visiblePoints = points.filter((run) => !hiddenBands.includes(run.band.label));
   const plotWidth = size.width - margin.left - margin.right;
   const plotHeight = size.height - margin.top - margin.bottom;
   const x = scaleLinear().domain([0, Math.max(1, ...points.map((run) => run.priorMiles)) * 1.1])
@@ -39,16 +41,21 @@ export default function VolumePace({ runs, fromDate = "", toDate = "" }: Props) 
   const y = scaleLinear().domain([Math.max(0, low - padding), high + padding]).nice()
     .range([size.height - margin.bottom, margin.top]);
 
-  return <div className="flex h-full min-h-64 flex-col">
-    <div aria-label="Run distance colors" className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-2 text-xs text-muted">
+  return <div className="flex h-full min-h-0 flex-col">
+    <div role="group" aria-label="Run distance colors" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 text-xs text-muted">
       <span>Run distance:</span>
-      {runDistanceBands.map((band) => <span key={band.label} className="inline-flex items-center gap-1.5">
-        <span aria-hidden="true" className="h-2.5 w-2.5" style={{ backgroundColor: band.color }} />{band.label}
-      </span>)}
+      {runDistanceBands.map((band) => {
+        const visible = !hiddenBands.includes(band.label);
+        return <button key={band.label} type="button" aria-pressed={visible} title={`${visible ? "Hide" : "Show"} ${band.label} runs`}
+          onClick={() => setHiddenBands((current) => current.includes(band.label) ? current.filter((label) => label !== band.label) : [...current, band.label])}
+          className={`inline-flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${visible ? "" : "opacity-50 line-through"}`}>
+          <span aria-hidden="true" className="h-2.5 w-2.5" style={{ backgroundColor: band.color }} />{band.label}
+        </button>;
+      })}
     </div>
     <div ref={containerRef} className="relative min-h-0 flex-1">
       {plotWidth > 0 && plotHeight > 0 && <svg width={size.width} height={size.height} className="absolute inset-0 text-muted" role="group" aria-label="Prior 30-day running volume versus pace">
-        <desc>Each equal-sized square represents one run in the selected date range. X is total miles during the 30 calendar days before the run, excluding its date and including available history before the selected range. Y is that run’s pace. Color groups the run’s own distance: under 3, 3 to under 4, 4 to under 5, 5 to under 6, and 6 or more miles. Excluded runs are omitted from marks and lookback totals.</desc>
+        <desc>Each equal-sized square represents one run in the selected date range. X is total miles during the 30 calendar days before the run, excluding its date and including available history before the selected range. Y is that run’s pace. Color groups the run’s own distance: under 3, 3 to under 4, 4 to under 5, 5 to under 6, and 6 or more miles. Click a legend category to toggle its marks. Legend toggles keep axes and lookback totals unchanged; excluded runs are omitted from both marks and lookback totals.</desc>
         {x.ticks(Math.max(2, Math.floor(plotWidth / 80))).map((miles) => <g key={miles} transform={`translate(${x(miles)},${size.height - margin.bottom})`} pointerEvents="none">
           <line y2={6} stroke="currentColor" /><text y={22} textAnchor="middle" fill="currentColor" fontSize={11}>{miles}</text>
         </g>)}
@@ -57,7 +64,7 @@ export default function VolumePace({ runs, fromDate = "", toDate = "" }: Props) 
           <text x={-8} dy="0.32em" textAnchor="end" fill="currentColor" fontSize={11}>{formatPace(pace)}</text>
         </g>)}
         <path d={`M${margin.left},${margin.top}V${size.height - margin.bottom}H${size.width - margin.right}`} fill="none" stroke="currentColor" pointerEvents="none" />
-        {points.map((run, index) => {
+        {visiblePoints.map((run, index) => {
           const description = `${run.date.slice(2)} · ${run.distanceMiles.toFixed(2)} mile run · ${formatPace(run.pace)} min/mi · Prior 30 days: ${run.priorMiles.toFixed(2)} miles`;
           return <rect key={run.id ?? `${run.date}-${index}`} data-volume-run="true" data-run-id={run.id}
             data-prior-miles={run.priorMiles} data-distance-band={run.band.label}
@@ -70,6 +77,9 @@ export default function VolumePace({ runs, fromDate = "", toDate = "" }: Props) 
         <text x={margin.left + plotWidth / 2} y={size.height - 8} textAnchor="middle" fill="currentColor" fontSize={12}>Prior 30-day running volume (miles)</text>
         <text transform={`translate(12,${margin.top + plotHeight / 2}) rotate(-90)`} textAnchor="middle" fill="currentColor" fontSize={12}>Pace (min/mile)</text>
         {!points.length && <text x={margin.left + plotWidth / 2} y={margin.top + plotHeight / 2} textAnchor="middle" fill="currentColor" fontSize={12}>{validRange ? "No runs with distance and pace data in this period" : "Choose a valid date range"}</text>}
+        {points.length > 0 && !visiblePoints.length && <text x={margin.left + plotWidth / 2} y={margin.top + plotHeight / 2} textAnchor="middle" fill="currentColor" fontSize={12}>
+          {hiddenBands.length === runDistanceBands.length ? "Select a legend category to show runs" : "No runs in the visible distance categories"}
+        </text>}
       </svg>}
     </div>
   </div>;

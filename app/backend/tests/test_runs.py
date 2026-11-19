@@ -138,6 +138,97 @@ class FatigueTests(ApiTestCase):
 
 
 class SummaryTests(ApiTestCase):
+    def test_numeric_distance_bounds_are_inclusive_and_filter_both_periods(self):
+        summary = self.get_json('/runs/summary?start=2026-09-01&end=2026-09-10&min_distance=3&max_distance=4')
+        self.assertEqual(summary['current']['totalRuns'], 1)
+        self.assertEqual(summary['current']['totalDistanceMiles'], 3)
+        self.assertEqual(summary['previous']['totalRuns'], 1)
+        self.assertEqual(summary['previous']['totalDistanceMiles'], 4)
+        exact = self.get_json('/runs/summary?min_distance=3&max_distance=3')
+        self.assertEqual(exact['current']['totalRuns'], 1)
+        self.assertEqual(exact['current']['totalDistanceMiles'], 3)
+        decimal = self.get_json('/runs/summary?min_distance=3.01&max_distance=5.99')
+        self.assertEqual(decimal['current']['totalRuns'], 1)
+        self.assertEqual(decimal['current']['totalDistanceMiles'], 4)
+
+    def test_one_sided_distance_bounds_combine_with_other_filters(self):
+        self.assertEqual(self.get_json('/runs/summary?min_distance=4')['current']['totalRuns'], 2)
+        self.assertEqual(self.get_json('/runs/summary?max_distance=4')['current']['totalRuns'], 2)
+        self.assertEqual(self.get_json('/runs/summary?max_distance=0')['current']['totalRuns'], 0)
+        params = {'min_distance': 3, 'max_distance': 6, 'min_pace': 9, 'max_pace': 10,
+                  'elevation': '0–100', 'temperature': '70–80', 'exclude_id': '2026-09-05-070000'}
+        response = self.client.get('/runs/summary', params=params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['current']['totalRuns'], 2)
+        self.assertEqual(response.json()['current']['totalDistanceMiles'], 7)
+
+    def test_invalid_numeric_distance_bounds_are_rejected(self):
+        for query in ['min_distance=-1', 'max_distance=-1', 'min_distance=NaN', 'max_distance=inf',
+                      'min_distance=5&max_distance=3']:
+            with self.subTest(query=query):
+                self.assertEqual(self.client.get('/runs/summary?' + query).status_code, 422)
+
+    def test_attribute_ranges_combine_with_pace_dates_and_exclusions(self):
+        params = {"start": "2026-09-01", "end": "2026-09-10", "min_pace": 9, "max_pace": 10,
+                  "distance": "3–4", "elevation": "0–100", "temperature": "70–80"}
+        response = self.client.get('/runs/summary', params=params)
+        self.assertEqual(response.status_code, 200)
+        summary = response.json()
+        self.assertEqual(summary['current']['totalRuns'], 1)
+        self.assertEqual(summary['current']['totalDistanceMiles'], 3)
+        self.assertEqual(summary['current']['avgPace'], 10)
+        self.assertEqual(summary['previous']['totalRuns'], 0)
+        params['exclude_id'] = '2026-09-01-070000'
+        self.assertEqual(self.client.get('/runs/summary', params=params).json()['current']['totalRuns'], 0)
+
+    def test_every_attribute_bucket_has_correct_boundaries_and_omits_nulls(self):
+        collection = mongomock.MongoClient().db.runs
+        distances = [0.5, 1, 1.99, 2, 3, 9.99, 10, None]
+        elevations = [-1, 0, 99.9, 100, 499.9, 500, 501, None]
+        temperatures = [-10, 29.9, 30, 39.9, 40, 89.9, 90, None]
+        collection.insert_many([make_run(str(i), '2026-09-01', 1800, d, 150,
+                                        elevationFeet=e, temperature=t, pace=9)
+                                for i, (d, e, t) in enumerate(zip(distances, elevations, temperatures))])
+        cases = [('distance', distances, [(f'{n}–{n + 1}', n, n + 1) for n in range(1, 10)] + [('10+', 10, None)]),
+                 ('elevation', elevations, [(f'{n}–{n + 100}', n, n + 100) for n in range(0, 500, 100)] + [('500+', 500, None)]),
+                 ('temperature', temperatures, [('<30', None, 30)] + [(f'{n}–{n + 10}', n, n + 10) for n in range(30, 90, 10)] + [('90+', 90, None)])]
+        with patch('app.services.summary.runs_collection', collection):
+            for field, values, options in cases:
+                for option, minimum, maximum in options:
+                    with self.subTest(field=field, option=option):
+                        expected = sum(v is not None and (minimum is None or v >= minimum) and
+                                       (maximum is None or v < maximum) for v in values)
+                        response = self.client.get('/runs/summary', params={field: option})
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.json()['current']['totalRuns'], expected)
+
+    def test_unknown_attribute_ranges_are_rejected(self):
+        for field in ['distance', 'elevation', 'temperature']:
+            self.assertEqual(self.client.get('/runs/summary', params={field: 'not-a-range'}).status_code, 422)
+
+    def test_pace_filters_apply_inclusively_to_both_periods(self):
+        summary = self.get_json('/runs/summary?start=2026-09-01&end=2026-09-10&min_pace=9&max_pace=9.5')
+        self.assertEqual(summary['current']['totalRuns'], 1)
+        self.assertEqual(summary['current']['totalDistanceMiles'], 6)
+        self.assertEqual(summary['current']['avgPace'], 9)
+        self.assertEqual(summary['current']['avgHeartRate'], 160)
+        self.assertEqual(summary['previous']['totalRuns'], 0)
+        exact = self.get_json('/runs/summary?min_pace=10&max_pace=10')['current']
+        self.assertEqual(exact['totalRuns'], 2)
+        self.assertEqual(exact['totalDistanceMiles'], 7)
+
+    def test_one_sided_pace_bounds_and_exclusions(self):
+        self.assertEqual(self.get_json('/runs/summary?min_pace=9.5')['current']['totalRuns'], 2)
+        self.assertEqual(self.get_json('/runs/summary?max_pace=9.5')['current']['totalRuns'], 1)
+        summary = self.get_json('/runs/summary?min_pace=9&max_pace=10&exclude_id=2026-09-05-070000')
+        self.assertEqual(summary['current']['totalRuns'], 2)
+        self.assertEqual(len(self.get_json('/runs')), 4)
+
+    def test_invalid_pace_bounds_are_rejected(self):
+        for query in ['min_pace=0', 'max_pace=-1', 'min_pace=NaN', 'max_pace=inf', 'min_pace=10&max_pace=9']:
+            with self.subTest(query=query):
+                self.assertEqual(self.client.get('/runs/summary?' + query).status_code, 422)
+
     def test_exclusions_apply_to_both_comparison_periods_without_deleting_runs(self):
         summary = self.get_json('/runs/summary?start=2026-09-01&end=2026-09-10&exclude_id=2026-09-01-070000&exclude_id=2026-08-25-070000')
         self.assertEqual(summary['current']['totalRuns'], 2)

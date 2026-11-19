@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAnalysis } from "@/components/AnalysisProvider";
 import { useDateRange } from "@/components/DateRangeProvider";
+import { useDashboardPace } from "@/components/DashboardPaceProvider";
 import PeriodComparison from "@/components/PeriodComparison";
 import { fetchSummary } from "@/lib/api";
 import { formatNumber, formatPace } from "@/lib/runFormatters";
@@ -51,18 +52,20 @@ const summaryMetrics = [
 export default function SummaryTiles({ compact = false }: { compact?: boolean }) {
   const { fromDate, toDate } = useDateRange();
   const { excludedRunIds } = useAnalysis();
-  const queryKey = JSON.stringify([fromDate, toDate, excludedRunIds]);
+  const { minPace, maxPace, minDistance, maxDistance, error, attributes } = useDashboardPace();
+  const queryKey = JSON.stringify([fromDate, toDate, excludedRunIds, minPace, maxPace, minDistance, maxDistance, error, attributes]);
   const [loaded, setLoaded] = useState<{ key: string; data: DashboardSummary } | null>(null);
   const summary = loaded?.key === queryKey ? loaded.data : null;
 
   // Refetch whenever the selected date range changes
   useEffect(() => {
+    if (error) return;
     let ignore = false; // drop a slow response if the range changed again
-    fetchSummary(fromDate, toDate, excludedRunIds)
+    fetchSummary(fromDate, toDate, excludedRunIds, minPace, maxPace, attributes, minDistance, maxDistance)
       .then((result) => { if (!ignore) setLoaded({ key: queryKey, data: result }); })
       .catch(() => { if (!ignore) setLoaded(null); });
     return () => { ignore = true; };
-  }, [fromDate, toDate, excludedRunIds, queryKey]);
+  }, [fromDate, toDate, excludedRunIds, minPace, maxPace, minDistance, maxDistance, error, attributes, queryKey]);
 
   return (
     <dl

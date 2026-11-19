@@ -1,9 +1,16 @@
 import FatigueChart from "@/features/insights/FatigueChart";
 import InsightsChat from "@/features/insights/InsightsChat";
-import { fetchFatigueRuns } from "@/lib/api";
+import { fetchFatigueRuns, fetchRuns } from "@/lib/api";
 
 export default async function InsightsPage() {
-  const fatigueRuns = await fetchFatigueRuns();
+  const [fatigueRuns, runs] = await Promise.all([fetchFatigueRuns(), fetchRuns()]);
+  const runDetails = new Map(runs.map((run) => [run.id, run]));
+  // Health rows need run attributes so global distance/elevation/temperature filters apply.
+  const enrichedRuns = fatigueRuns.map((run) => {
+    const details = runDetails.get(run.id);
+    return { ...run, distanceMiles: details?.distanceMiles ?? null,
+      elevationFeet: details?.elevationFeet ?? null, temperature: details?.temperature ?? null };
+  });
 
   return (
     <div className="space-y-6">
@@ -17,7 +24,7 @@ export default async function InsightsPage() {
           <InsightsChat />
         </section>
         <section aria-label="Fatigue parallel coordinates" className="min-w-0 rounded-lg border border-border border-t-2 border-t-accent/30 bg-surface">
-          <FatigueChart runs={fatigueRuns} />
+          <FatigueChart runs={enrichedRuns} />
           <p className="px-4 pb-3 text-xs text-muted">Daily active energy is separate from workout calories.</p>
         </section>
       </div>

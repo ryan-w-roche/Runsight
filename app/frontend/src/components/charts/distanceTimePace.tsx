@@ -50,9 +50,16 @@ export default function DistanceTimePace({ runs, fromDate, toDate }: Props) {
   const plotWidth = size.width - margin.left - margin.right;
   const plotHeight = size.height - margin.top - margin.bottom;
   const ready = plotWidth > 0 && plotHeight > 0;
-  const boxes = distancePaceBoxplots(points);
+  const distances = points.map((run) => run.distanceMiles);
+  const minimumDistance = distances.length ? Math.min(...distances) : 0;
+  const maximumDistance = distances.length ? Math.max(...distances) : 1;
+  const distancePadding = Math.max((maximumDistance - minimumDistance) * 0.1, 0.1);
+  // Keep a group's box visible when a narrow selection excludes its usual midpoint.
+  const boxes = distancePaceBoxplots(points).map((box) => ({ ...box,
+    center: Math.max(minimumDistance, Math.min(maximumDistance, box.center)),
+  }));
   const selectedBox = boxes.find((box) => box.id === activeBox);
-  const x = scaleLinear().domain([0, Math.max(1, ...points.map((run) => run.distanceMiles), ...boxes.map((box) => box.center + 0.2)) * 1.1])
+  const x = scaleLinear().domain([Math.max(0, minimumDistance - distancePadding), maximumDistance + distancePadding])
     .nice().range([margin.left, size.width - margin.right]);
   const paces = points.map((run) => run.pace);
   const low = paces.length ? Math.min(...paces) : 6;

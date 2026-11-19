@@ -64,7 +64,7 @@ export default function CurrentRunsList({
                   </button>
                 </th>;
               })}
-              <th scope="col" className="w-10"><span className="sr-only">Analysis actions</span></th>
+              <th scope="col" className="px-2 py-3 text-center font-semibold">Exclude</th>
             </tr>
           </thead>
           <tbody className="text-foreground">

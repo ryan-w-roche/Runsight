@@ -1,41 +1,16 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useDashboardPace } from "@/components/DashboardPaceProvider";
+import { dashboardAttributeFilters as filters } from "@/lib/dashboardFilterRanges";
 
 type FilterBarProps = {
   children?: ReactNode;
 };
 
-const filters = [
-  {
-    name: "distance",
-    label: "Distance (mi)",
-    allLabel: "All distances",
-    options: [
-      ...Array.from({ length: 9 }, (_, index) => `${index + 1}–${index + 2}`),
-      "10+",
-    ],
-  },
-  {
-    name: "elevation",
-    label: "Elevation (ft)",
-    allLabel: "All elevations",
-    options: [
-      ...Array.from({ length: 5 }, (_, index) => `${index * 100}–${(index + 1) * 100}`),
-      "500+",
-    ],
-  },
-  {
-    name: "temperature",
-    label: "Temperature (°F)",
-    allLabel: "All temperatures",
-    options: [
-      "<30",
-      ...Array.from({ length: 6 }, (_, index) => `${30 + index * 10}–${40 + index * 10}`),
-      "90+",
-    ],
-  },
-];
-
 export default function FilterBar({ children }: FilterBarProps) {
+  const { minimum, maximum, setMinimum, setMaximum, error, attributes, setAttribute, reset,
+    minimumDistance, maximumDistance, setMinimumDistance, setMaximumDistance, distanceError, paceError } = useDashboardPace();
   return (
     <section
       aria-label="Filters"
@@ -43,25 +18,37 @@ export default function FilterBar({ children }: FilterBarProps) {
       rounded-lg border border-border bg-surface-muted px-4 py-3
       text-foreground"
     >
-      <form className="flex w-full flex-wrap items-center gap-4">
+      <form className="flex w-full flex-wrap items-center gap-4" onSubmit={(event) => event.preventDefault()}
+        onReset={(event) => { event.preventDefault(); reset(); }}>
         <strong className="text-sm font-bold text-foreground">Filter:</strong>
+        <label className="flex items-center gap-2 text-sm font-medium">Min distance (mi)
+          <input type="number" min="0" step="any" name="minDistance" value={minimumDistance} onChange={(event) => setMinimumDistance(event.target.value)}
+            placeholder="Any" aria-invalid={!!distanceError}
+            className="w-20 rounded border border-control-border bg-surface px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-accent" />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium">Max distance (mi)
+          <input type="number" min="0" step="any" name="maxDistance" value={maximumDistance} onChange={(event) => setMaximumDistance(event.target.value)}
+            placeholder="Any" aria-invalid={!!distanceError}
+            className="w-20 rounded border border-control-border bg-surface px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-accent" />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium">Min pace
+          <input type="text" name="minPace" value={minimum} onChange={(event) => setMinimum(event.target.value)}
+            placeholder="m:ss" maxLength={6} aria-invalid={!!paceError}
+            className="w-20 rounded border border-control-border bg-surface px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-accent" />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium">Max pace
+          <input type="text" name="maxPace" value={maximum} onChange={(event) => setMaximum(event.target.value)}
+            placeholder="m:ss" maxLength={6} aria-invalid={!!paceError}
+            className="w-20 rounded border border-control-border bg-surface px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-accent" />
+        </label>
+        <span className="text-xs text-muted">min/mi</span>
         {filters.map((filter) => (
-          <label
-            key={filter.name}
-            className="flex items-center gap-2 text-sm font-medium"
-          >
+          <label key={filter.name} className="flex items-center gap-2 text-sm font-medium">
             {filter.label}
-            <select
-              name={filter.name}
-              defaultValue=""
-              className="rounded border border-control-border bg-surface px-3 py-1.5 text-sm text-foreground scheme-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-            >
+            <select name={filter.name} value={attributes[filter.name]} onChange={(event) => setAttribute(filter.name, event.target.value)}
+              className="rounded border border-control-border bg-surface px-3 py-1.5 text-sm text-foreground scheme-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">
               <option value="">{filter.allLabel}</option>
-              {filter.options.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
+              {filter.options.map((option) => <option key={option.value} value={option.value}>{option.value}</option>)}
             </select>
           </label>
         ))}
@@ -86,6 +73,7 @@ export default function FilterBar({ children }: FilterBarProps) {
           Reset filters
         </button>
       </form>
+      {error && <p role="alert" className="w-full text-xs text-foreground">{error}</p>}
     </section>
   );
 }

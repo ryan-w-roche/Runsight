@@ -1,8 +1,9 @@
 import DistanceTimePaceChart from "@/features/dashboard/DistanceTimePaceChart";
-import TemperatureHeartRateByPaceChart from "@/features/dashboard/TemperatureHeartRateByPaceChart";
+import VolumePaceChart from "@/features/trends/VolumePaceChart";
 import RunsInSelection from "@/features/dashboard/RunsInSelection";
 import SummaryTiles from "@/features/dashboard/SummaryTiles";
 import { fetchRuns } from "@/lib/api";
+import FilterBar from "@/components/FilterBar";
 
 export default async function Home() {
   const runs = await fetchRuns();
@@ -18,6 +19,7 @@ export default async function Home() {
         </p>
       </header>
       <SummaryTiles />
+      <FilterBar />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section
           aria-label="Distance and pace by run date"
@@ -26,10 +28,10 @@ export default async function Home() {
           <DistanceTimePaceChart runs={runs} />
         </section>
         <section
-          aria-label="Heart rate by temperature and selected pace range"
+          aria-label="Prior 30-day volume and pace"
           className="h-80 min-w-0 rounded-lg border border-border border-t-2 border-t-accent/30 bg-surface-muted"
         >
-          <TemperatureHeartRateByPaceChart runs={runs} />
+          <VolumePaceChart runs={runs} />
         </section>
       </div>
       <section

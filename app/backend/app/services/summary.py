@@ -4,10 +4,36 @@ from app.db import runs_collection
 from app.services.runs import date_match
 
 
-def summarize(start: date | None, end: date | None, excluded_run_ids: list[str] | None = None):
+def parse_attribute_filters(distance: str | None, elevation: str | None, temperature: str | None):
+    ranges = {
+        "distanceMiles": {**{f"{n}–{n + 1}": {"$gte": n, "$lt": n + 1} for n in range(1, 10)}, "10+": {"$gte": 10}},
+        "elevationFeet": {**{f"{n}–{n + 100}": {"$gte": n, "$lt": n + 100} for n in range(0, 500, 100)}, "500+": {"$gte": 500}},
+        "temperature": {"<30": {"$lt": 30, "$ne": None}, **{f"{n}–{n + 10}": {"$gte": n, "$lt": n + 10} for n in range(30, 90, 10)}, "90+": {"$gte": 90}},
+    }
+    result = {}
+    for field, selected in zip(ranges, [distance, elevation, temperature]):
+        if not selected:
+            continue
+        if selected not in ranges[field]:
+            raise ValueError(f"Invalid {field} filter")
+        result[field] = ranges[field][selected]
+    return result
+
+
+def summarize(start: date | None, end: date | None, excluded_run_ids: list[str] | None = None,
+              min_pace: float | None = None, max_pace: float | None = None,
+              attribute_filters: dict | None = None):
     match = date_match(start, end)
+    match["$match"].update(attribute_filters or {})
     if excluded_run_ids:
         match["$match"]["_id"] = {"$nin": excluded_run_ids}
+    if min_pace is not None or max_pace is not None:
+        bounds = {"$gt": 0}
+        if min_pace is not None:
+            bounds["$gte"] = min_pace
+        if max_pace is not None:
+            bounds["$lte"] = max_pace
+        match["$match"]["pace"] = bounds
     pipeline = [
         match,
         # Collapse every matched run into one document. $sum and $avg skip nulls
@@ -41,8 +67,11 @@ def previous_period(start: date, end: date):
     return start - length, start - timedelta(days=1)
 
 
-def dashboard_summary(start: date | None, end: date | None, excluded_run_ids: list[str] | None = None):
+def dashboard_summary(start: date | None, end: date | None, excluded_run_ids: list[str] | None = None,
+                      min_pace: float | None = None, max_pace: float | None = None,
+                      attribute_filters: dict | None = None):
     previous = None
     if start and end and start <= end:
-        previous = summarize(*previous_period(start, end), excluded_run_ids=excluded_run_ids)
-    return {"current": summarize(start, end, excluded_run_ids), "previous": previous}
+        previous = summarize(*previous_period(start, end), excluded_run_ids=excluded_run_ids,
+                             min_pace=min_pace, max_pace=max_pace, attribute_filters=attribute_filters)
+    return {"current": summarize(start, end, excluded_run_ids, min_pace, max_pace, attribute_filters), "previous": previous}

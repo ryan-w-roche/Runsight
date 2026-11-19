@@ -6,6 +6,7 @@ import TopBar from "../components/TopBar";
 import DateRangeProvider from "../components/DateRangeProvider";
 import AnalysisProvider from "../components/AnalysisProvider";
 import AnalysisControls from "../components/AnalysisControls";
+import DashboardPaceProvider from "../components/DashboardPaceProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-screen bg-background text-foreground">
         <DateRangeProvider>
+        <DashboardPaceProvider>
         <AnalysisProvider>
         <div className="flex min-h-screen flex-col md:flex-row">
           <Sidebar />
@@ -45,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
         </AnalysisProvider>
+        </DashboardPaceProvider>
         </DateRangeProvider>
       </body>
     </html>

@@ -1,6 +1,6 @@
 import PaceTimeChart from "@/features/trends/PaceTimeChart";
 import PaceTempChart from "@/features/trends/PaceTempChart";
-import VolumePaceChart from "@/features/trends/VolumePaceChart";
+import TemperatureHeartRateByPaceChart from "@/features/dashboard/TemperatureHeartRateByPaceChart";
 import { fetchRuns } from "@/lib/api";
 
 export default async function TrendsPage() {
@@ -27,19 +27,19 @@ export default async function TrendsPage() {
           <PaceTempChart runs={runs} />
         </section>
         <section
-          aria-label="Future chart"
+          aria-label="Heart rate by temperature and selected pace range"
           className="h-96 min-w-0 rounded-lg border border-border border-t-2 border-t-accent/30 bg-surface-muted"
         >
-          <h2 className="px-4 pt-3 text-base font-semibold text-foreground">
-            To Build: What moves with what Chart
-          </h2>
+          <TemperatureHeartRateByPaceChart runs={runs} />
         </section>
       </div>
       <section
-        aria-label="Prior 30-day volume and pace"
+        aria-label="Future chart"
         className="h-96 w-full min-w-0 rounded-lg border border-border border-t-2 border-t-accent/30 bg-surface-muted"
       >
-        <VolumePaceChart runs={runs} />
+        <h2 className="px-4 pt-3 text-base font-semibold text-foreground">
+          To Build: What moves with what Chart
+        </h2>
       </section>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { FatigueRun } from "@/types/fatigue";
 import type { CurrentRun } from "@/types/run";
 import type { DashboardSummary } from "@/types/summary";
+import type { AttributeSelections } from "@/lib/dashboardFilterRanges";
 
 // FastAPI backend (app/backend). NEXT_PUBLIC_ makes it usable in the browser too.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -16,10 +17,15 @@ export const fetchRuns = () => getJson<CurrentRun[]>("/runs");
 export const fetchFatigueRuns = () => getJson<FatigueRun[]>("/insights/fatigue");
 
 // Dates are YYYY-MM-DD; an empty string means no limit on that side.
-export function fetchSummary(start: string, end: string, excludedRunIds: readonly string[] = []) {
+export function fetchSummary(start: string, end: string, excludedRunIds: readonly string[] = [], minPace: number | null = null, maxPace: number | null = null, attributes?: AttributeSelections, minDistance: number | null = null, maxDistance: number | null = null) {
   const params = new URLSearchParams();
   if (start) params.set("start", start);
   if (end) params.set("end", end);
   for (const id of excludedRunIds) params.append("exclude_id", id);
+  if (minPace !== null) params.set("min_pace", String(minPace));
+  if (maxPace !== null) params.set("max_pace", String(maxPace));
+  if (minDistance !== null) params.set("min_distance", String(minDistance));
+  if (maxDistance !== null) params.set("max_distance", String(maxDistance));
+  for (const [name, value] of Object.entries(attributes ?? {})) if (value) params.set(name, value);
   return getJson<DashboardSummary>(`/runs/summary?${params}`);
 }

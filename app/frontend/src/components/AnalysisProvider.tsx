@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import type { CurrentRun } from "@/types/run";
+import { matchesDashboardRun, useDashboardPace } from "@/components/DashboardPaceProvider";
 
 type ExcludedRun = Pick<CurrentRun, "id" | "date" | "distanceMiles" | "pace">;
 type Analysis = {
@@ -84,10 +85,11 @@ export function useAnalysis() {
   return analysis;
 }
 
-export function useAnalysisRuns<T extends { id?: string }>(runs: readonly T[]) {
+export function useAnalysisRuns<T extends { id?: string; pace: number | null; distanceMiles?: number | null; elevationFeet?: number | null; temperature?: number | null }>(runs: readonly T[], applyFilters = true) {
   const { excludedRunIds } = useAnalysis();
+  const filters = useDashboardPace();
   return useMemo(() => {
     const excluded = new Set(excludedRunIds);
-    return runs.filter((run) => !run.id || !excluded.has(run.id));
-  }, [runs, excludedRunIds]);
+    return runs.filter((run) => (!run.id || !excluded.has(run.id)) && (!applyFilters || matchesDashboardRun(run, filters)));
+  }, [runs, excludedRunIds, applyFilters, filters]);
 }
