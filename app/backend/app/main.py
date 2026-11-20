@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,7 +11,8 @@ app = FastAPI()
 # Add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    # FRONTEND_ORIGINS is a comma-separated list set on Vercel, e.g. https://runsight.vercel.app
+    allow_origins=os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(","),
     allow_methods=["GET"],
     allow_headers=["*"]
 )

@@ -1,0 +1,4 @@
+# Slim dependency list for deploying the API on Vercel. The root requirements.txt covers local tooling.
+fastapi==0.159.1
+pymongo==4.19.0
+python-dotenv==1.2.4
