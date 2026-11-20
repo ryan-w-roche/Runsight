@@ -3,8 +3,8 @@ import type { CurrentRun } from "@/types/run";
 import type { DashboardSummary } from "@/types/summary";
 import type { AttributeSelections } from "@/lib/dashboardFilterRanges";
 
-// FastAPI backend (app/backend). NEXT_PUBLIC_ makes it usable in the browser too.
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Server code calls the FastAPI backend directly. The browser goes through the /api proxy in next.config.ts so it only talks to this site's domain.
+const API_URL = typeof window === "undefined" ? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000" : "/api";
 
 async function getJson<T>(path: string): Promise<T> {
   // no-store: fetch fresh data on every request instead of once at build time
