@@ -1,0 +1,14 @@
+name: Sync fork with upstream
+on:
+  schedule:
+    - cron: "*/15 * * * *"  # every 15 minutes
+  workflow_dispatch:         # adds a manual "Run workflow" button
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api repos/${{ github.repository }}/merge-upstream -f branch=main
+        env:
+          GH_TOKEN: ${{ github.token }}
